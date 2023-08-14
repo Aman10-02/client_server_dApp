@@ -19,7 +19,7 @@ import socketio
 # 'request' package is used in the 'add_file' function for multiple actions.
 
 sio = socketio.Client() 
-client_ip = app.config['NODE_ADDR']
+client_ip = app.config['ADDR']
 connection_status = False
 
 blockchain = Blockchain()
@@ -233,5 +233,5 @@ def disconnect_blockchain():
     return render_template('index.html')
 
 if __name__ == '__main__':
-    # app.run(host = client_ip['Host'], port= client_ip['Port'], debug=True)
-    app.run(app.config['NODE_ADDR'], debug=True)
+    app.run(host = client_ip['Host'], port= client_ip['Port'], debug=True)
+    # app.run(app.config['NODE_ADDR'], debug=True)
