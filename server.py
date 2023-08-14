@@ -43,8 +43,8 @@ def encrypt_file(file_path, file_key):
     pyAesCrypt.encryptFile(file_path, file_path + ".aes",  file_key, app.config['BUFFER_SIZE'])
 
 def hash_user_file(user_file, file_key):
-    # encrypt_file(user_file, file_key)
-    encrypted_file_path = user_file # + ".aes"
+    encrypt_file(user_file, file_key)
+    encrypted_file_path = user_file + ".aes"
     # client = ipfshttpclient.connect('/dns/ipfs.infura.io/tcp/5001/https')
     client = Client(api_key = app.config['KEY'] )
     response = client.upload_file(encrypted_file_path)
@@ -209,7 +209,8 @@ def connect_blockchain():
         # sio.connect('http://'+app.config['SERVER_IP'])
         sio.connect(app.config['SERVER_IP'])
         sio.emit('add_client_node', 
-                {'node_address' : client_ip['Host'] + ':' + str(client_ip['Port'])}
+                # {'node_address' : client_ip['Host'] + ':' + str(client_ip['Port'])}
+                {'node_address' : app.config['NODE_ADDR']}
                 )
         nodes = nodes + 1
 
@@ -224,11 +225,13 @@ def disconnect_blockchain():
     global connection_status
     connection_status = False
     sio.emit('remove_client_node', 
-            {'node_address' : client_ip['Host'] + ':' + str(client_ip['Port'])}
+            # {'node_address' : client_ip['Host'] + ':' + str(client_ip['Port'])}
+            {'node_address' : app.config['NODE_ADDR']}
             )
     sio.disconnect()
     
     return render_template('index.html')
 
 if __name__ == '__main__':
-    app.run(host = client_ip['Host'], port= client_ip['Port'], debug=True)
+    # app.run(host = client_ip['Host'], port= client_ip['Port'], debug=True)
+    app.run(app.config['NODE_ADDR'], debug=True)

@@ -5,6 +5,7 @@ import json
 from flask import Flask, jsonify, request
 import requests
 from urllib.parse import urlparse
+from my_constants import app
 
 # Building a Blockchain
 
@@ -17,7 +18,7 @@ class Blockchain:
         # self.receiver = [] ##########
         self.create_block(proof = 1, previous_hash = '0' , sender = 'N.A' , receiver = 'N.A' , file_hash = 'N.A') ##########
         self.nodes = set()
-        self.nodes.add("127.0.0.1:5111")
+        self.nodes.add(app.config['SERVER_IP'])
     
     def create_block(self, proof, previous_hash, sender, receiver, file_hash):
         block = {'index': len(self.chain) + 1,
@@ -87,7 +88,8 @@ class Blockchain:
         longest_chain = None
         max_length = len(self.chain)
         for node in network:
-            response = requests.get(f'http://{node}/get_chain')
+            # response = requests.get(f'http://{node}/get_chain')
+            response = requests.get(f'{node}/get_chain')
             if response.status_code == 200:
                 length = response.json()['length']
                 chain = response.json()['chain']
