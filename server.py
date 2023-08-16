@@ -274,15 +274,15 @@ def disconnect():
     print("disconnected from signaling server")
 
 @sio.on("offer")
-def offer(data):
+async def offer(data):
     peer_id = data["peerId"]
-    peer_connection = create_peer_connection(peer_id)
+    peer_connection = await create_peer_connection(peer_id)
 
-    peer_connection.setRemoteDescription(RTCSessionDescription(sdp=data["offer"]["sdp"], type=data["offer"]["type"]))
+    await peer_connection.setRemoteDescription(RTCSessionDescription(sdp=data["offer"]["sdp"], type=data["offer"]["type"]))
     print("offer")
     # Create an answer
-    answer = peer_connection.createAnswer()
-    peer_connection.setLocalDescription(answer)
+    answer = await peer_connection.createAnswer()
+    await peer_connection.setLocalDescription(answer)
     
     sio.emit("message", {"event":"answer",  "payload": {"sdp": answer.sdp, "type": answer.type}, "peerId": peer_id})
 
