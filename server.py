@@ -26,9 +26,9 @@ connection_status = False
 peer_connections = {}
 blockchain = Blockchain()
 
-def replace_chain():
+async def replace_chain():
         network = blockchain.nodes
-        # print(network)
+        print("network")
         longest_chain = None
         initial = len(blockchain.chain)
         response = requests.get(f'{app.config["SERVER_IP"]}/get_chain')
@@ -52,7 +52,8 @@ def replace_chain():
         
         
         for node in network:
-            send_offer_and_icecandidate(node, call_back)
+            print("insidenode")
+            await send_offer_and_icecandidate(node, call_back)
 
         if initial < len(blockchain.chain):
             return True
@@ -132,9 +133,9 @@ def download():
     return render_template('download.html' , message = "Welcome!")
 
 @app.route('/add_file', methods=['POST'])
-def add_file():
+async def add_file():
     
-    is_chain_replaced = replace_chain()
+    is_chain_replaced = await replace_chain()
 
     if is_chain_replaced:
         print('The nodes had different chains so the chain was replaced by the longest one.')
@@ -181,9 +182,9 @@ def add_file():
             return render_template('upload.html' , message = "File succesfully uploaded")
 
 @app.route('/retrieve_file', methods=['POST'])
-def retrieve_file():
+async def retrieve_file():
 
-    is_chain_replaced = replace_chain()
+    is_chain_replaced = await replace_chain()
 
     if is_chain_replaced:
         print('The nodes had different chains so the chain was replaced by the longest one.')
@@ -217,16 +218,16 @@ def retrieve_file():
 
 
 async def send_offer_and_icecandidate(peer_id, call_back):
-    pc = create_peer_connection(peer_id, call_back)
+    pc = await create_peer_connection(peer_id, call_back)
 
+    channel = pc.createDataChannel("my-channel")
+    # channel.send({"type": "getChain"})
     # Create offer
     offer = await pc.createOffer()
     pc.setLocalDescription(offer)
     sio.emit("message", {"event" : "offer", "payload" : {"sdp": offer.sdp, "type": offer.type}, "peerId": peer_id} )
-    channel = pc.createDataChannel("my-channel")
-    channel.send({"type": "getChain"})
 
-def create_peer_connection(peer_id, call_back):
+async def create_peer_connection(peer_id, call_back):
     pc = RTCPeerConnection()
 
     # peer_connections[peer_id] = pc
@@ -304,14 +305,14 @@ def my_response(message):
     blockchain.nodes = pickle.loads(message['data'])
 
 @app.route('/connect_blockchain')
-def connect_blockchain():
+async def connect_blockchain():
     # print("sio:", sio.id)
     global connection_status
     nodes = len(blockchain.nodes)
     if connection_status is False:
        sio.connect(app.config['SERVER_IP'])
     # sio.wait()
-    is_chain_replaced = replace_chain()
+    is_chain_replaced = await replace_chain()
     connection_status = True
     return render_template('connect_blockchain.html', messages = {'message1' : "Welcome to the services page",
                                                                   'message2' : "Congratulations , you are now connected to the blockchain.",
@@ -322,13 +323,14 @@ def disconnect_blockchain():
     global connection_status
     connection_status = False
     sio.disconnect()
-    sio.wait()
+    # sio.wait()
     
     return render_template('index.html')
 
 @sio.on("get_chain")
 def get_chain():
-    sio.emit( "get_chain_response", {'chain': blockchain.chain, 'length': len(blockchain.chain)} )
+    print("getChain")
+    sio.emit("get_chain_response", {'chain': blockchain.chain, 'length': len(blockchain.chain)} )
 
 if __name__ == '__main__':
     app.run(host = client_ip['Host'], port= client_ip['Port'], debug=True)
