@@ -5,8 +5,6 @@ import json
 from flask import Flask, jsonify, request
 import requests
 from urllib.parse import urlparse
-from my_constants import app
-
 # Building a Blockchain
 
 class Blockchain:
@@ -18,7 +16,7 @@ class Blockchain:
         # self.receiver = [] ##########
         self.create_block(proof = 1, previous_hash = '0' , sender = 'N.A' , receiver = 'N.A' , file_hash = 'N.A') ##########
         self.nodes = set()
-        self.nodes.add(app.config['SERVER_IP'])
+        # self.nodes.add(app.config['SERVER_IP'])
     
     def create_block(self, proof, previous_hash, sender, receiver, file_hash):
         block = {'index': len(self.chain) + 1,
@@ -83,23 +81,44 @@ class Blockchain:
         self.create_block(proof, previous_hash, sender, receiver, file_hash)
         return index
     
-    def replace_chain(self):
-        network = self.nodes
-        longest_chain = None
-        max_length = len(self.chain)
-        for node in network:
-            # response = requests.get(f'http://{node}/get_chain')
-            response = requests.get(f'{node}/get_chain')
-            if response.status_code == 200:
-                length = response.json()['length']
-                chain = response.json()['chain']
-                if length > max_length and self.is_chain_valid(chain):
-                    max_length = length
-                    longest_chain = chain
-        if longest_chain:
-            self.chain = longest_chain
-            return True
-        return False
+    
+
+
+#     def replace_chain(self):
+#         network = self.nodes
+#         longest_chain = None
+#         max_length = len(self.chain)
+
+#         @sio.on('get_chain_response')
+#         def get_chain_response(data):
+#             nonlocal longest_chain, max_length
+#             length = data['length']
+#             chain = data['chain']
+#             if length > max_length and self.is_chain_valid(chain):
+#                 max_length = length
+#                 longest_chain = chain
+#                 sio.emit('replace_chain', {'new_chain': longest_chain})
+
+#         for node in network:
+#             sio.emit('get_chain')
+
+#         sio.wait()
+
+#         if longest_chain:
+#             self.chain = longest_chain
+#             return True
+#         return False
+
+# if __name__ == '__main__':
+#     blockchain = YourBlockchain()
+#     result = blockchain.replace_chain()
+#     if result:
+#         print("Chain replaced successfully.")
+#     else:
+#         print("No valid longer chain found.")
+
+
+
 
 # Part 2 - Mining our Blockchain
 
