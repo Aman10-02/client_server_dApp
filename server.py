@@ -47,6 +47,7 @@ async def replace_chain():
                 length = data.get('length')
                 max_length = len(blockchain.chain)
                 chain = data.get('chain')
+                print("from ch",chain)
                 if length > max_length and blockchain.is_chain_valid(chain):
                     blockchain.chain = chain
         
@@ -224,7 +225,7 @@ async def send_offer_and_icecandidate(peer_id, call_back):
     # channel.send({"type": "getChain"})
     # Create offer
     offer = await pc.createOffer()
-    pc.setLocalDescription(offer)
+    await pc.setLocalDescription(offer)
     sio.emit("message", {"event" : "offer", "payload" : {"sdp": offer.sdp, "type": offer.type}, "peerId": peer_id} )
 
 async def create_peer_connection(peer_id, call_back):
@@ -238,6 +239,7 @@ async def create_peer_connection(peer_id, call_back):
         async def on_message(message):
             print(f"Received msg: {message}")
             msg = message.get("type")
+            print("message type", msg)
             if msg == "getChain":
                 channel.send({"type": "chain", "data": {'chain': blockchain.chain, 'length': len(blockchain.chain)} })
             elif msg == "chain":
@@ -250,6 +252,7 @@ async def create_peer_connection(peer_id, call_back):
     @pc.on("icecandidate")
     def on_icecandidate(candidate):
         if candidate:
+            print("icecandidate")
             sio.emit("message", {"event":"ice-candidate","payload": candidate.to_sdp(), "peerId": peer_id})
         else:
             print("ICE Gathering Complete")
@@ -276,7 +279,7 @@ def offer(data):
     peer_connection = create_peer_connection(peer_id)
 
     peer_connection.setRemoteDescription(RTCSessionDescription(sdp=data["offer"]["sdp"], type=data["offer"]["type"]))
-
+    print("offer")
     # Create an answer
     answer = peer_connection.createAnswer()
     peer_connection.setLocalDescription(answer)
@@ -287,6 +290,7 @@ def offer(data):
 def answer(data):
     peer_id = data["peerId"]
     peer_connection = peer_connections.get(peer_id)
+    print("answer",data)
     if peer_connection:
         peer_connection.setRemoteDescription(RTCSessionDescription(sdp=data["answer"]["sdp"], type=data["answer"]["type"]))
 
@@ -294,6 +298,7 @@ def answer(data):
 def ice_candidate(data):
     peer_id = data["peerId"]
     peer_connection = peer_connections.get(peer_id)
+    print("on icecandi",data)
     if peer_connection:
         ice_candidate = RTCIceCandidate(sdp=data["candidate"]["candidate"], sdpMid=data["candidate"]["sdpMid"], sdpMLineIndex=data["candidate"]["sdpMLineIndex"])
         peer_connection.addIceCandidate(ice_candidate)
@@ -330,7 +335,7 @@ def disconnect_blockchain():
 @sio.on("get_chain")
 def get_chain():
     print("getChain")
-    sio.emit("get_chain_response", {'chain': blockchain.chain, 'length': len(blockchain.chain)} )
+    # sio.emit("get_chain_response", {'chain': blockchain.chain, 'length': len(blockchain.chain)} )
 
 if __name__ == '__main__':
     app.run(host = client_ip['Host'], port= client_ip['Port'], debug=True)
