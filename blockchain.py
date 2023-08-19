@@ -14,7 +14,7 @@ class Blockchain:
         # self.shared_files = [] 
         # self.sender = [] ###########
         # self.receiver = [] ##########
-        self.create_block(proof = 1, previous_hash = '0' , sender = 'N.A' , receiver = 'N.A' , file_hash = 'N.A') ##########
+        # self.create_block(proof = 1, previous_hash = '0' , sender = 'N.A' , receiver = 'N.A' , file_hash = 'N.A') ##########
         self.nodes = set()
         # self.nodes.add(app.config['SERVER_IP'])
     

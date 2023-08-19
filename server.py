@@ -1,25 +1,29 @@
 import os
 import urllib.request
-from my_constants import app, sio
+from my_constants import app
+import asyncio
+import threading
 import pyAesCrypt
 from flask import Flask, flash, request, redirect, render_template, url_for, jsonify
 from werkzeug.utils import secure_filename
-# from flask_socketio import SocketIO, send, emit
+from flask_socketio import SocketIO, send, emit
 # from "web3.storage" import Web3Storage
 from web3storage import Client
 
 # from utils import send_offer_and_icecandidate, create_peer_connection
-import socket
+import socketio
 import pickle
 from blockchain import Blockchain
 import requests
 
-from aiortc import RTCPeerConnection, RTCSessionDescription, RTCIceCandidate
+from aiortc import RTCPeerConnection, RTCSessionDescription, RTCIceCandidate, RTCIceGatherer
 
 # The package requests is used in the 'hash_user_file' and 'retrieve_from hash' functions to send http post requests.
 # Notice that 'requests' is different than the package 'request'.
 # 'request' package is used in the 'add_file' function for multiple actions.
 
+myid = ''
+sio = socketio.AsyncClient(logger = True,engineio_logger=True)
 client_ip = app.config['ADDR']
 connection_status = False
 
@@ -39,22 +43,19 @@ async def replace_chain():
             if length > initial and blockchain.is_chain_valid(chain):
                 blockchain.chain = chain
 
-
-
-        # network = self.nodes
-        # initial = len(self.chain)
-        def call_back(data):
-                length = data.get('length')
-                max_length = len(blockchain.chain)
-                chain = data.get('chain')
-                print("from ch",chain)
-                if length > max_length and blockchain.is_chain_valid(chain):
-                    blockchain.chain = chain
+        # def call_back(data):
+        #         length = data.get('length')
+        #         max_length = len(blockchain.chain)
+        #         chain = data.get('chain')
+        #         print("from ch",chain)
+        #         if length > max_length and blockchain.is_chain_valid(chain):
+        #             blockchain.chain = chain
         
         
-        for node in network:
-            print("insidenode")
-            await send_offer_and_icecandidate(node, call_back)
+        # for node in network:
+        #     if node != myid :
+        #         print("insidenode")
+        #         await send_offer_and_icecandidate(node, call_back)
 
         if initial < len(blockchain.chain):
             return True
@@ -136,12 +137,12 @@ def download():
 @app.route('/add_file', methods=['POST'])
 async def add_file():
     
-    is_chain_replaced = await replace_chain()
+    # is_chain_replaced = await replace_chain()
 
-    if is_chain_replaced:
-        print('The nodes had different chains so the chain was replaced by the longest one.')
-    else:
-        print('All good. The chain is the largest one.')
+    # if is_chain_replaced:
+    #     print('The nodes had different chains so the chain was replaced by the longest one.')
+    # else:
+    #     print('All good. The chain is the largest one.')
 
     if request.method == 'POST':
         error_flag = True
@@ -163,9 +164,16 @@ async def add_file():
                 sender = request.form['sender_name']
                 receiver = request.form['receiver_name']
                 file_key = request.form['file_key']
+                    
                 try:
+                    def cb(data) :
+                        if data.get("flag") == False :
+                            nonlocal error_flag, message
+                            error_flag = True
+                            message = 'Could not complete. Try again !!'
                     hashed_output1 = hash_user_file(file_path, file_key)
                     index = blockchain.add_file(sender, receiver, hashed_output1)
+                    sio.emit("set_chain", {"chain": blockchain.chain}, callback = cb )
                 except Exception as err:
                     message = str(err)
                     error_flag = True
@@ -185,12 +193,12 @@ async def add_file():
 @app.route('/retrieve_file', methods=['POST'])
 async def retrieve_file():
 
-    is_chain_replaced = await replace_chain()
+    # is_chain_replaced = await replace_chain()
 
-    if is_chain_replaced:
-        print('The nodes had different chains so the chain was replaced by the longest one.')
-    else:
-        print('All good. The chain is the largest one.')
+    # if is_chain_replaced:
+    #     print('The nodes had different chains so the chain was replaced by the longest one.')
+    # else:
+    #     print('All good. The chain is the largest one.')
 
     if request.method == 'POST':
 
@@ -217,126 +225,78 @@ async def retrieve_file():
         else:
             return render_template('download.html' , message = "File successfully downloaded")
 
-
-async def send_offer_and_icecandidate(peer_id, call_back):
-    pc = await create_peer_connection(peer_id, call_back)
-
-    channel = pc.createDataChannel("my-channel")
-    # channel.send({"type": "getChain"})
-    # Create offer
-    offer = await pc.createOffer()
-    await pc.setLocalDescription(offer)
-    sio.emit("message", {"event" : "offer", "payload" : {"sdp": offer.sdp, "type": offer.type}, "peerId": peer_id} )
-
-async def create_peer_connection(peer_id, call_back):
-    pc = RTCPeerConnection()
-
-    # peer_connections[peer_id] = pc
-
-    @pc.on("datachannel")
-    def on_datachannel(channel):
-        @channel.on("message")
-        async def on_message(message):
-            print(f"Received msg: {message}")
-            msg = message.get("type")
-            print("message type", msg)
-            if msg == "getChain":
-                channel.send({"type": "chain", "data": {'chain': blockchain.chain, 'length': len(blockchain.chain)} })
-            elif msg == "chain":
-                print(f"Received data: {message.get('data')}")
-                call_back(message.get('data'))
-
-    
-
-    # Generate and send ICE candidates
-    @pc.on("icecandidate")
-    def on_icecandidate(candidate):
-        if candidate:
-            print("icecandidate")
-            sio.emit("message", {"event":"ice-candidate","payload": candidate.to_sdp(), "peerId": peer_id})
-        else:
-            print("ICE Gathering Complete")
-
-    
-    # # Wait for ICE gathering to complete
-    # pc.gather_candidates()
-
-    peer_connections[peer_id] = pc
-    return pc
-
+@sio.on("me")
+def setme(data) :
+    global myid
+    myid = data["id"]
+    print("id", myid)
 
 @sio.on("connect")
-def connect():
+async def connect():
     print("Connected to signaling server")
 
 @sio.on("disconnect")
-def disconnect():
+async def disconnect():
     print("disconnected from signaling server")
 
-@sio.on("offer")
-async def offer(data):
-    peer_id = data["peerId"]
-    peer_connection = await create_peer_connection(peer_id)
 
-    await peer_connection.setRemoteDescription(RTCSessionDescription(sdp=data["offer"]["sdp"], type=data["offer"]["type"]))
-    print("offer")
-    # Create an answer
-    answer = await peer_connection.createAnswer()
-    await peer_connection.setLocalDescription(answer)
-    
-    sio.emit("message", {"event":"answer",  "payload": {"sdp": answer.sdp, "type": answer.type}, "peerId": peer_id})
 
-@sio.on("answer")
-def answer(data):
-    peer_id = data["peerId"]
-    peer_connection = peer_connections.get(peer_id)
-    print("answer",data)
-    if peer_connection:
-        peer_connection.setRemoteDescription(RTCSessionDescription(sdp=data["answer"]["sdp"], type=data["answer"]["type"]))
-
-@sio.on("ice-candidate")
-def ice_candidate(data):
-    peer_id = data["peerId"]
-    peer_connection = peer_connections.get(peer_id)
-    print("on icecandi",data)
-    if peer_connection:
-        ice_candidate = RTCIceCandidate(sdp=data["candidate"]["candidate"], sdpMid=data["candidate"]["sdpMid"], sdpMLineIndex=data["candidate"]["sdpMLineIndex"])
-        peer_connection.addIceCandidate(ice_candidate)
+@sio.on("update_chain")
+async def update_chain(data):
+    print("message", data)
+    blockchain.chain = data.get("chain")
 
 @sio.on("my_response")
-def my_response(message):
+async def my_response(message):
     print("message", message)
     print(pickle.loads(message['data']))
     blockchain.nodes = pickle.loads(message['data'])
 
+@sio.on("get_chain")
+async def get_chain(data):
+    print("getChain")
+    chain = blockchain.chain
+    length = len(chain)
+    response = {'chain': chain, 'length': length}
+    return response
+
 @app.route('/connect_blockchain')
 async def connect_blockchain():
-    # print("sio:", sio.id)
     global connection_status
     nodes = len(blockchain.nodes)
-    if connection_status is False:
-       sio.connect(app.config['SERVER_IP'])
-    # sio.wait()
+    
+    if not connection_status:
+        thread = threading.Thread(target= connect_socketio)
+        thread.start()
+    
     is_chain_replaced = await replace_chain()
     connection_status = True
-    return render_template('connect_blockchain.html', messages = {'message1' : "Welcome to the services page",
-                                                                  'message2' : "Congratulations , you are now connected to the blockchain.",
-                                                                 } , chain = blockchain.chain, nodes = nodes)
+    
+    # Render the template immediately
+    return render_template('connect_blockchain.html', messages={
+        'message1': "Welcome to the services page",
+        'message2': "Congratulations, you are now connected to the blockchain.",
+    }, chain=blockchain.chain, nodes=nodes)
+
+def connect_socketio():
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    
+    loop.run_until_complete(sio.connect(app.config['SERVER_IP']))
+    loop.run_until_complete(sio.wait())
+    loop.close()
 
 @app.route('/disconnect_blockchain')
-def disconnect_blockchain():
+async def disconnect_blockchain():
     global connection_status
     connection_status = False
-    sio.disconnect()
-    # sio.wait()
+    await sio.disconnect()
+    # await sio.wait()
     
     return render_template('index.html')
 
-@sio.on("get_chain")
-def get_chain():
-    print("getChain")
-    # sio.emit("get_chain_response", {'chain': blockchain.chain, 'length': len(blockchain.chain)} )
 
 if __name__ == '__main__':
+    # loop = asyncio.get_event_loop()
     app.run(host = client_ip['Host'], port= client_ip['Port'], debug=True)
     # app.run(app.config['NODE_ADDR'], debug=True)
