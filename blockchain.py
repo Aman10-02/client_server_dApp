@@ -66,7 +66,7 @@ class Blockchain:
             block_index += 1
         return True
     
-    def add_file(self, sender, receiver, file_hash):
+    async def add_file(self, sender, receiver, file_hash):
         # self.sender.append({'sender': sender}) #########
         # self.receiver.append({'receiver': receiver}) ##########
         # self.shared_files.append({'file_hash': file_hash})
